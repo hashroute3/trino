@@ -45,6 +45,7 @@ import jakarta.annotation.Nullable;
 import java.io.BufferedReader;
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.time.Instant;
@@ -714,7 +715,12 @@ public final class HttpPageBufferClient
                 boolean complete = getComplete(response, uri);
                 boolean remoteTaskFailed = getTaskFailed(response, uri);
 
-                try (LittleEndianDataInputStream input = new LittleEndianDataInputStream(response.getInputStream())) {
+                InputStream inputStream = switch (response.getContent()) {
+                    case Response.InputStreamContent inputStreamContent -> inputStreamContent.inputStream();
+                    case Response.BytesContent _ -> throw new IllegalStateException("Expected unbuffered content");
+                };
+
+                try (LittleEndianDataInputStream input = new LittleEndianDataInputStream(inputStream)) {
                     int magic = input.readInt();
                     if (magic != SERIALIZED_PAGES_MAGIC) {
                         throw new IllegalStateException(format("Invalid stream header, expected 0x%08x, but was 0x%08x", SERIALIZED_PAGES_MAGIC, magic));
